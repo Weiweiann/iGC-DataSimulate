@@ -47,9 +47,6 @@ data <- dataSimulation(n_people = 50)
 # iGC
 
 require(iGC)
-
-cnv = data.table(data[[1]])
-gene = data.table(data[[2]])
 find_cna_driven_gene(gene_cna = cnv, gene_exp = gene)
 
 
