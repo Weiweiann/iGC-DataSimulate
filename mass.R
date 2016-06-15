@@ -1,13 +1,15 @@
 require(MASS)
 library(data.table)
 
-dataSimulation <- function(n_people=50, n_genes=100){
+dataSimulation <- function(n_people=1, n_genes=100){
   Genes <- vector()
   CNVs <- vector()
 
   for(i in 1:n_people){
   # simulate a sample 
-  correlation = c(0, 0.2, 0.6, 0.8, 1.0)
+    
+  
+  correlation = c(runif(1,0,0.3), runif(1,0.3,0.7),runif(1,0.7,1))
   n_genes = 100
   sample<-vector()
   
@@ -42,11 +44,23 @@ dataSimulation <- function(n_people=50, n_genes=100){
 }
  
 ## data[[1]]: CNV, data[[2]]: Gene
-data <- dataSimulation(n_people = 50)
+data <- dataSimulation(n_people = 1)
 
 # iGC
 
 require(iGC)
-find_cna_driven_gene(gene_cna = cnv, gene_exp = gene)
+
+
+
+# cnv data should be -1, 0, 1
+cnv = data[[1]]
+gene = data[[2]]
+cnv[,2:30] = 1
+cnv[,31:40] = 0
+cnv[,41:51] = -1
+result <- find_cna_driven_gene(gene_cna = cnv, gene_exp = gene)
+
+
+
 
 
