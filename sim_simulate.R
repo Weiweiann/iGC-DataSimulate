@@ -1,11 +1,11 @@
-require(MASS)
-library(data.table)
+## for sim, simulate data can not use data.table, otherwise there will be error.
+
 
 
 dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_threhold = 2.5){
   Genes <- vector()
   CNVs <- vector()
-
+  
   # setup correlation vector: random from 0~0.3 0.3~0.7 0.7~1
   if (n_genes %% 3 ==1){
     correlation = c(runif(round(n_genes/3),0,0.3), runif(round(n_genes/3),0.3,0.7),runif(round(n_genes/3)+1,0.7,1))
@@ -18,8 +18,8 @@ dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_th
   for(i in 1:n_genes){
     # simulate a gene
     cor = correlation[i]
-   
-        
+    
+    
     # cor_matirx is the matrix that fills with symmetry correlation value.
     cor_matrix = diag(nrow = 2,ncol = 2)
     cor_matrix[upper.tri(cor_matrix)] <- cor
@@ -33,7 +33,7 @@ dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_th
     while(qnorm(cnv_normal_possibility, mean = cnv_default_mean, sd = 1) < cnv_threhold){
       cnv_default_mean = cnv_default_mean + 0.05
     }
-  
+    
     # the second one is the mean value for gene expression, 
     # it can be any number since it does not effect the simulation
     mu = c(cnv_threhold, 5) 
@@ -52,12 +52,12 @@ dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_th
   Gene_name = paste('GENE',seq(1:n_genes),sep = "")
   Sample_name = paste('Sample', seq(1:n_people), sep="")
   
-  CNVs <- data.table(GENE = Gene_name,CNVs)
+  CNVs <- data.frame(GENE = Gene_name,CNVs)
   colnames(CNVs) <- c('GENE',Sample_name)
   
-  Genes <- data.table(GENE = Gene_name,Genes)
+  Genes <- data.frame(GENE = Gene_name,Genes)
   colnames(Genes) <- c('GENE',Sample_name)
-
+  
   
   simData <- list()
   simData[[1]] <- CNVs
@@ -68,28 +68,41 @@ dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_th
   cat("Number of people", n_people, '\n')
   return(simData)
 }
- 
+
 ## data[[1]]: CNV, data[[2]]: Gene
 data <- dataSimulation(n_people = 100, n_genes = 300)
 
-# iGC
 
-require(iGC)
-
-
-
-# cnv data should be -1, 0, 1 (for iGC)
 cnv = data[[1]]
 gene = data[[2]]
 
-# for iGC
-temp = which(cnv < cnv_threhold, arr.ind = T)
-cnv[temp] = 0
-cnv[temp[3001:dim(temp)[1],]] = -1
-cnv[which(cnv >= cnv_threhold, arr.ind = T)] = 1
-cnv[,1] =  paste('GENE',seq(1:300),sep="")
+fake_ann <- chrom.table[1:dim(cnv)[1], c('chr','start','end')]
+cnv_sim <- data.frame(gene = cnv$GENE,fake_ann, cnv[,-1])
+gene_sim <- data.frame(gene = cnv$GENE, fake_ann, gene[,-1])
 
-result <- find_cna_driven_gene(gene_cna = cnv, gene_exp = gene)
+
+assemble.data(dep.data = cnv_sim,
+              indep.data = gene_sim,
+              dep.ann = colnames(cnv_sim)[1:4],
+              indep.ann = colnames(gene_sim)[1:4],
+              dep.id = "gene",
+              dep.chr = "chr",
+              dep.pos = "start",
+              indep.id = "gene",
+              indep.chr = "chr",
+              indep.pos = "start",
+              overwrite = TRUE,
+              run.name = "simulate")
+
+sim_samples = paste('Sample',seq(1:100),sep="")
+
+integrated.analysis(samples = sim_samples,
+                    input.regions = c(1,2,3,4),
+                    zscores = TRUE,
+                    method = "full",
+                    run.name = "simulate")
+
+
 
 
 
