@@ -1,19 +1,18 @@
 require(MASS)
 library(data.table)
 
+n_genes = 100
+n_people = 100
+cnv_proportion = 0.3
+cnv_threhold = 2.5
+correlation = correlation_simualate(n_genes = n_genes)
 
-dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_threhold = 2.5){
+
+dataSimulation <- function(n_people, cnv_proportion, cnv_threhold , correlation){
   Genes <- vector()
   CNVs <- vector()
 
-  # setup correlation vector: random from 0~0.3 0.3~0.7 0.7~1
-  if (n_genes %% 3 ==1){
-    correlation = c(runif(round(n_genes/3),0,0.3), runif(round(n_genes/3),0.3,0.7),runif(round(n_genes/3)+1,0.7,1))
-  }else if(n_genes %% 3 ==2 ){
-    correlation = c(runif(round(n_genes/3),0,0.3), runif(round(n_genes/3),0.3,0.7),runif(round(n_genes/3)+2,0.7,1))
-  }else{
-    correlation = c(runif(round(n_genes/3),0,0.3), runif(round(n_genes/3),0.3,0.7),runif(round(n_genes/3),0.7,1))
-  }
+  n_genes = length(correlation)
   
   for(i in 1:n_genes){
     # simulate a gene
@@ -70,7 +69,8 @@ dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_th
 }
  
 ## data[[1]]: CNV, data[[2]]: Gene
-data <- dataSimulation(n_people = 100, n_genes = 300)
+data <- dataSimulation(n_people = n_people, cnv_proportion = cnv_proportion, 
+                       cnv_threhold = cnv_threhold, correlation = correlation)
 
 # iGC
 
@@ -83,13 +83,34 @@ cnv = data[[1]]
 gene = data[[2]]
 
 # for iGC
+cnv_threhold = 2.5
 temp = which(cnv < cnv_threhold, arr.ind = T)
+# 隨便亂設0跟1
 cnv[temp] = 0
-cnv[temp[3001:dim(temp)[1],]] = -1
+cnv[temp[(dim(temp)[1]/3):dim(temp)[1],]] = -1
 cnv[which(cnv >= cnv_threhold, arr.ind = T)] = 1
-cnv[,1] =  paste('GENE',seq(1:300),sep="")
+cnv[,1] =  paste('GENE',seq(1:n_genes),sep="")
 
-result <- find_cna_driven_gene(gene_cna = cnv, gene_exp = gene)
+igc_result <- find_cna_driven_gene(gene_cna = cnv, gene_exp = gene)
 
 
+# simulate answer 
+answer = data.frame(Gene=  paste('GENE',seq(1:n_genes),sep = ""), Cor =data[[3]])
+answer$Cor[which(answer$Cor > 0.3)] = 'true' 
+answer$Cor[which(answer$Cor <= 0.3)] = 'false'
+colnames(answer) = c('Gene', 'Answer')
 
+# pvalue < 0.5 as True, else as False
+igc_T_gene <- igc_result$both$GENE[which(igc_result$both$gain_p_value < 0.05)]
+igc_F_gene <- igc_result$both$GENE[which(igc_result$both$gain_p_value >= 0.05)]
+igc_answer = rbind( data.frame(Gene = igc_T_gene, Answer= 'true'), data.frame(Gene = igc_F_gene, Answer='false'))
+igc_answer = igc_answer[order(igc_answer$Gene),]
+answer_sort = answer[order(answer$Gene),] # 因為沒辦法完全按照數字來排列，所以只好統一用奇怪的方式排列了~"~
+answer_sort$Answer = factor(answer_sort$Answer)
+xtab = table(answer_sort$Answer, igc_answer$Answer)
+
+library(caret)
+cat("iGC_sen: ",sensitivity(answer_sort$Answer, igc_answer$Answer), "iGC_spe: ", specificity(answer_sort$Answer, igc_answer$Answer),'\n')
+
+
+source('./sim_simulate.R')

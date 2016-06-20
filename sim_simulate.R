@@ -1,19 +1,11 @@
 ## for sim, simulate data can not use data.table, otherwise there will be error.
+data("chrom.table")
 
-
-
-dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_threhold = 2.5){
+dataSimulation <- function(n_people,cnv_proportion, cnv_threhold, correlation){
   Genes <- vector()
   CNVs <- vector()
   
-  # setup correlation vector: random from 0~0.3 0.3~0.7 0.7~1
-  if (n_genes %% 3 ==1){
-    correlation = c(runif(round(n_genes/3),0,0.3), runif(round(n_genes/3),0.3,0.7),runif(round(n_genes/3)+1,0.7,1))
-  }else if(n_genes %% 3 ==2 ){
-    correlation = c(runif(round(n_genes/3),0,0.3), runif(round(n_genes/3),0.3,0.7),runif(round(n_genes/3)+2,0.7,1))
-  }else{
-    correlation = c(runif(round(n_genes/3),0,0.3), runif(round(n_genes/3),0.3,0.7),runif(round(n_genes/3),0.7,1))
-  }
+  n_genes = length(correlation)
   
   for(i in 1:n_genes){
     # simulate a gene
@@ -52,10 +44,10 @@ dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_th
   Gene_name = paste('GENE',seq(1:n_genes),sep = "")
   Sample_name = paste('Sample', seq(1:n_people), sep="")
   
-  CNVs <- data.frame(GENE = Gene_name,CNVs)
+  CNVs <- data.frame(GENE = Gene_name,CNVs) # data.table  -> data.frame
   colnames(CNVs) <- c('GENE',Sample_name)
   
-  Genes <- data.frame(GENE = Gene_name,Genes)
+  Genes <- data.frame(GENE = Gene_name,Genes) # data.table  -> data.frame
   colnames(Genes) <- c('GENE',Sample_name)
   
   
@@ -70,12 +62,12 @@ dataSimulation <- function(n_people=100, n_genes=300, cnv_proportion=0.3, cnv_th
 }
 
 ## data[[1]]: CNV, data[[2]]: Gene
-data <- dataSimulation(n_people = 100, n_genes = 300)
-
+data <- dataSimulation(n_people = n_people, cnv_proportion = cnv_proportion, cnv_threhold = cnv_threhold, correlation = correlation)
 
 cnv = data[[1]]
 gene = data[[2]]
 
+# generate a fake annotation file from data("chrom.table")
 fake_ann <- chrom.table[1:dim(cnv)[1], c('chr','start','end')]
 cnv_sim <- data.frame(gene = cnv$GENE,fake_ann, cnv[,-1])
 gene_sim <- data.frame(gene = cnv$GENE, fake_ann, gene[,-1])
@@ -94,14 +86,33 @@ assemble.data(dep.data = cnv_sim,
               overwrite = TRUE,
               run.name = "simulate")
 
-sim_samples = paste('Sample',seq(1:100),sep="")
+sim_samples = paste('Sample',seq(1:n_people),sep="")
 
+# fake annotation containes chr 1 to chr 6.
 integrated.analysis(samples = sim_samples,
-                    input.regions = c(1,2,3,4),
                     zscores = TRUE,
                     method = "full",
                     run.name = "simulate")
 
+# the p-value results are located in ./simulate/full/gpvals.pat.c.*
+pvalues <-vector()
+for(file in list.files(path = './simulate/full/', pattern = 'gpvals.pat.c*')){
+  n =1 
+  variable <- paste('pvalue.',n,sep="")
+  path = paste('./simulate/full/',file,sep="")
+  pvalues <- c(pvalues,dget(path))
+}
+
+
+sim_result = data.frame(Gene = paste('Gene',seq(1:n_genes),sep=''), 
+                        pval = pvalues)
+sim_result.2 <- data.frame(Gene=sim_result$Gene, Answer='empty',stringsAsFactors = F)
+sim_result.2$Answer[which(sim_result$pval < 0.05)] = 'true'
+sim_result.2$Answer[which(sim_result$pval >= 0.05)] = 'false'
+answer$Answer = factor(answer$Answer)
+sim_result.2$Answer = factor(sim_result.2$Answer)
+sim_tab <- table(answer$Answer, sim_result.2$Answer)
+cat("sim_sen: ",sensitivity(answer$Answer, sim_result.2$Answer), "sim_spe: ", specificity(answer$Answer, sim_result.2$Answer),'\n')
 
 
 
